@@ -35,6 +35,7 @@ type Item struct {
 	Updated     time.Time
 	Created     time.Time
 	Enclosure   *Enclosure
+	Image       *Image // used as an RSS media url
 	Content     string
 }
 

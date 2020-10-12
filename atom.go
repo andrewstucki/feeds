@@ -9,7 +9,10 @@ import (
 
 // Generates Atom feed as XML
 
-const ns = "http://www.w3.org/2005/Atom"
+const (
+	ns      = "http://www.w3.org/2005/Atom"
+	mediaNS = "http://search.yahoo.com/mrss/"
+)
 
 type AtomPerson struct {
 	Name  string `xml:"name,omitempty"`
@@ -39,21 +42,29 @@ type AtomContributor struct {
 	AtomPerson
 }
 
+type AtomMediaContent struct {
+	Medium string `xml:"medium,attr,omitempty"`
+	URL    string `xml:"url,attr,omitempty"`
+	Width  int    `xml:"width,attr,omitempty"`
+	Height int    `xml:"height,attr,omitempty"`
+}
+
 type AtomEntry struct {
-	XMLName     xml.Name `xml:"entry"`
-	Xmlns       string   `xml:"xmlns,attr,omitempty"`
-	Title       string   `xml:"title"`   // required
-	Updated     string   `xml:"updated"` // required
-	Id          string   `xml:"id"`      // required
-	Category    string   `xml:"category,omitempty"`
-	Content     *AtomContent
-	Rights      string `xml:"rights,omitempty"`
-	Source      string `xml:"source,omitempty"`
-	Published   string `xml:"published,omitempty"`
-	Contributor *AtomContributor
-	Links       []AtomLink   // required if no child 'content' elements
-	Summary     *AtomSummary // required if content has src or content is base64
-	Author      *AtomAuthor  // required if feed lacks an author
+	XMLName      xml.Name `xml:"entry"`
+	Xmlns        string   `xml:"xmlns,attr,omitempty"`
+	Title        string   `xml:"title"`   // required
+	Updated      string   `xml:"updated"` // required
+	Id           string   `xml:"id"`      // required
+	Category     string   `xml:"category,omitempty"`
+	Content      *AtomContent
+	Rights       string `xml:"rights,omitempty"`
+	Source       string `xml:"source,omitempty"`
+	Published    string `xml:"published,omitempty"`
+	Contributor  *AtomContributor
+	MediaContent *AtomMediaContent `xml:"media:content,omitempty"`
+	Links        []AtomLink        // required if no child 'content' elements
+	Summary      *AtomSummary      // required if content has src or content is base64
+	Author       *AtomAuthor       // required if feed lacks an author
 }
 
 // Multiple links with different rel can coexist
@@ -68,7 +79,8 @@ type AtomLink struct {
 
 type AtomFeed struct {
 	XMLName     xml.Name `xml:"feed"`
-	Xmlns       string   `xml:"xmlns,attr"`
+	Xmlns       string   `xml:"xmlns:atom,attr"`
+	MediaNS     string   `xml:"xmlns:media,attr"`
 	Title       string   `xml:"title"`   // required
 	Id          string   `xml:"id"`      // required
 	Updated     string   `xml:"updated"` // required
@@ -127,6 +139,16 @@ func newAtomEntry(i *Item) *AtomEntry {
 		x.Content = &AtomContent{Content: i.Content, Type: "html"}
 	}
 
+	// encode an image as media:content
+	if i.Image != nil {
+		x.MediaContent = &AtomMediaContent{
+			Medium: "image",
+			URL:    i.Image.Url,
+			Width:  i.Image.Width,
+			Height: i.Image.Height,
+		}
+	}
+
 	if i.Enclosure != nil && link_rel != "enclosure" {
 		x.Links = append(x.Links, AtomLink{Href: i.Enclosure.Url, Rel: "enclosure", Type: i.Enclosure.Type, Length: i.Enclosure.Length})
 	}
@@ -142,6 +164,7 @@ func (a *Atom) AtomFeed() *AtomFeed {
 	updated := anyTimeFormat(time.RFC3339, a.Updated, a.Created)
 	feed := &AtomFeed{
 		Xmlns:    ns,
+		MediaNS:  mediaNS,
 		Title:    a.Title,
 		Link:     &AtomLink{Href: a.Link.Href, Rel: a.Link.Rel},
 		Subtitle: a.Description,
